@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# jetbrains
+.idea/
+
+# local pnpm store (do not commit)
+.pnpm-store/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
