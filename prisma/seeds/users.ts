@@ -1,24 +1,62 @@
 import type { PrismaClient } from "../../app/generated/prisma/client";
+import { ORGANIZATION_NAMES } from "./organizations";
 
 export async function seedUsers(prisma: PrismaClient) {
-  const users = [
-    {
-      name: "Oleg Parent",
+  const parent = await prisma.user.upsert({
+    where: { email: "parent@example.com" },
+    update: { name: "Pat Parent" },
+    create: {
+      name: "Pat Parent",
       email: "parent@example.com",
     },
-    {
-      name: "Alex Instructor",
+  });
+
+  const instructor = await prisma.user.upsert({
+    where: { email: "instructor@example.com" },
+    update: { name: "Ira Instructor" },
+    create: {
+      name: "Ira Instructor",
       email: "instructor@example.com",
     },
-  ];
+  });
 
-  for (const user of users) {
-    await prisma.user.upsert({
-      where: { email: user.email },
-      update: { name: user.name },
-      create: user,
-    });
-  }
+  const north = await prisma.organization.findFirstOrThrow({
+    where: { name: ORGANIZATION_NAMES.north },
+  });
+  const south = await prisma.organization.findFirstOrThrow({
+    where: { name: ORGANIZATION_NAMES.south },
+  });
 
-  console.log(`Seeded ${users.length} users`);
+  await prisma.membership.deleteMany({
+    where: { userId: parent.id },
+  });
+  await prisma.membership.create({
+    data: {
+      userId: parent.id,
+      organizationId: north.id,
+      role: "PARENT",
+    },
+  });
+
+  await prisma.membership.deleteMany({
+    where: { userId: instructor.id },
+  });
+  await prisma.membership.createMany({
+    data: [
+      {
+        userId: instructor.id,
+        organizationId: north.id,
+        role: "INSTRUCTOR",
+      },
+      {
+        userId: instructor.id,
+        organizationId: south.id,
+        role: "INSTRUCTOR",
+      },
+    ],
+  });
+
+  console.log("Seeded parent + instructor and memberships");
+
+  return { parent, instructor, north, south };
 }

@@ -12,8 +12,62 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  PARENT
+  INSTRUCTOR
+  ADMIN
+}
+
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  memberships Membership[]
+  children Child[]
+  sessions ClassSession[]
+}
+
+model Organization {
+  id String @id @default(cuid())
+  name String
+  memberships Membership[]
+  sessions ClassSession[]
+}
+
+model Membership {
+  id String @id @default(cuid())
+  userId String
+  organizationId String
+  role Role
+  user User @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Child {
+  id String @id @default(cuid())
+  name String
+  parentId String
+  parent User @relation(fields: [parentId], references: [id])
+  enrollments Enrollment[]
+}
+
+model ClassSession {
+  id String @id @default(cuid())
+  organizationId String
+  title String
+  startsAt DateTime
+  capacity Int
+  instructorId String
+  organisation Organization @relation(fields: [organizationId], references: [id])
+  instructor User @relation(fields: [instructorId], references: [id])
+  enrollments Enrollment[]
+}
+
+model Enrollment {
+  id String @id @default(cuid())
+  sessionId String
+  childId String
+  createdAt DateTime @default(now())
+  session ClassSession @relation(fields: [sessionId], references: [id])
+  child Child @relation(fields: [childId], references: [id])
 }
