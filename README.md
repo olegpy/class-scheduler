@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Class Scheduler
 
-## Getting Started
+Next.js (App Router) + TypeScript + Prisma + local PostgreSQL.
 
-First, run the development server:
+## Requirements
+
+- Node.js 20+
+- [pnpm](https://pnpm.io)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for local Postgres)
+
+## Local setup (Postgres via Docker)
+
+### 1. Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`.env` should include (defaults match `docker-compose.yml`):
 
-## Learn More
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=class_scheduler
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/class_scheduler
+```
 
-To learn more about Next.js, take a look at the following resources:
+`DATABASE_URL` points Prisma at the **local** Docker Postgres on `localhost:5432`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Start local Postgres
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose up -d
+```
 
-## Deploy on Vercel
+Check it is running:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+docker compose ps
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 4. Apply schema + seed
+
+```bash
+pnpm exec prisma generate
+pnpm db:migrate
+pnpm db:seed
+```
+
+Or reset DB, migrate, and seed in one step:
+
+```bash
+pnpm db:reset
+```
+
+Seed creates: 2 organizations, a parent with kids, an instructor, an upcoming open session, a full session, and a past session.
+
+### 5. Run the app
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### 6. (Optional) Browse data
+
+```bash
+pnpm exec prisma studio
+```
+
+## Useful commands
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start Next.js |
+| `pnpm test` | Run Vitest |
+| `docker compose up -d` | Start local Postgres |
+| `docker compose down` | Stop Postgres |
+| `pnpm db:migrate` | Create/apply migrations |
+| `pnpm db:seed` | Seed demo data |
+| `pnpm db:reset` | Reset DB + migrate + seed |
+
+## Notes
+
+- This project uses **local Postgres in Docker**, not a hosted DB.
+- If port `5432` is already in use, change the host port in `docker-compose.yml` (e.g. `"5433:5432"`) and update `DATABASE_URL` to match.
+- Fake signed-in user (env id / cookie) is added during the assessment, not as part of this setup.

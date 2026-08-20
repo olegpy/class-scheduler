@@ -2,19 +2,15 @@ import type { PrismaClient } from "../../app/generated/prisma/client";
 import { ORGANIZATION_NAMES } from "./organizations";
 
 export async function seedUsers(prisma: PrismaClient) {
-  const parent = await prisma.user.upsert({
-    where: { email: "parent@example.com" },
-    update: { name: "Pat Parent" },
-    create: {
+  const parent = await prisma.user.create({
+    data: {
       name: "Pat Parent",
       email: "parent@example.com",
     },
   });
 
-  const instructor = await prisma.user.upsert({
-    where: { email: "instructor@example.com" },
-    update: { name: "Ira Instructor" },
-    create: {
+  const instructor = await prisma.user.create({
+    data: {
       name: "Ira Instructor",
       email: "instructor@example.com",
     },
@@ -28,7 +24,7 @@ export async function seedUsers(prisma: PrismaClient) {
   });
 
   await prisma.membership.deleteMany({
-    where: { userId: parent.id },
+    where: { userId: { in: [parent.id, instructor.id] } },
   });
   await prisma.membership.create({
     data: {
@@ -36,10 +32,6 @@ export async function seedUsers(prisma: PrismaClient) {
       organizationId: north.id,
       role: "PARENT",
     },
-  });
-
-  await prisma.membership.deleteMany({
-    where: { userId: instructor.id },
   });
   await prisma.membership.createMany({
     data: [
