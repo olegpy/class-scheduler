@@ -22,13 +22,14 @@ pnpm install
 cp .env.example .env
 ```
 
-`.env` should include (defaults match `docker-compose.yml`):
+Defaults match `docker-compose.yml`:
 
 ```env
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=class_scheduler
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/class_scheduler
+CURRENT_USER_ID=
 ```
 
 `DATABASE_URL` points Prisma at the **local** Docker Postgres on `localhost:5432`.
@@ -42,24 +43,25 @@ docker compose up -d
 Check it is running:
 
 ```bash
-docker compose ps
-```
-
-### 4. Apply schema + seed
-
-```bash
 pnpm exec prisma generate
-pnpm db:migrate
-pnpm db:seed
-```
-
-Or reset DB, migrate, and seed in one step:
-
-```bash
 pnpm db:reset
 ```
 
-Seed creates: 2 organizations, a parent with kids, an instructor, an upcoming open session, a full session, and a past session.
+Seed creates: 2 organizations, parent (`parent@example.com`) with kids Amy/Ben, instructor (`instructor@example.com`), an open upcoming session, a full session, and a past session.
+
+After seed, put the parent id in `.env`:
+
+```env
+CURRENT_USER_ID=<id of parent@example.com>
+```
+
+Get the id from the seed log (`parentId`) or Prisma Studio → User → `parent@example.com`.
+
+Restart `pnpm dev`, open http://localhost:3000/sessions.
+
+To see the enrol form: page must say Pat Parent. Under Beginner Soccer you get Child + Enrol. Yoga shows full (no form).
+
+To see instructor view: set `CURRENT_USER_ID` to Ira Instructor’s id, restart, refresh. List only, no enrol form.
 
 ### 5. Run the app
 
@@ -67,9 +69,15 @@ Seed creates: 2 organizations, a parent with kids, an instructor, an upcoming op
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) (`/` redirects to `/sessions`).
 
-### 6. (Optional) Browse data
+### 6. Tests
+
+```bash
+pnpm test
+```
+
+### 7. (Optional) Browse data
 
 ```bash
 pnpm exec prisma studio
@@ -89,6 +97,7 @@ pnpm exec prisma studio
 
 ## Notes
 
-- This project uses **local Postgres in Docker**, not a hosted DB.
-- If port `5432` is already in use, change the host port in `docker-compose.yml` (e.g. `"5433:5432"`) and update `DATABASE_URL` to match.
-- Fake signed-in user (env id / cookie) is added during the assessment, not as part of this setup.
+- Uses **local Postgres in Docker**, not a hosted DB.
+- If port `5432` is taken, change the host port in `docker-compose.yml` and update `DATABASE_URL`.
+- Prefer `pnpm db:reset` over re-running seed alone (seed emails are unique).
+- After `db:reset`, ids change — copy the new parent id into `CURRENT_USER_ID` again.
