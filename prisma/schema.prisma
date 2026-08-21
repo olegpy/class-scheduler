@@ -70,4 +70,6 @@ model Enrollment {
   createdAt DateTime @default(now())
   session ClassSession @relation(fields: [sessionId], references: [id])
   child Child @relation(fields: [childId], references: [id])
+
+  @@unique([sessionId, childId])
 }

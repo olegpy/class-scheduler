@@ -1,9 +1,13 @@
+"use server";
+
+import {revalidatePath} from "next/cache";
 import {getCurrentUser} from "@/app/lib/auth";
 import {db} from "@/app/lib/db";
+import {getEnrollmentBlockReason} from "@/app/lib/enrollmentRules";
 
-export type EnrollState  ={
+export type EnrollState = {
     ok: boolean;
-    messages: string;
+    message: string;
 }
 
 export async function enrollChild(
@@ -20,69 +24,81 @@ export async function enrollChild(
     }
 
     const user = await getCurrentUser();
-
     if (!user) {
         return {
             ok: false,
-            message: "Please select asigned-in user"
+            message: "Please sign in"
         }
     }
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-            await db.$transaction(
-                async (tx) => {
-                    const lockedSessions = tx.$queryRaw<Array<{
-                        id: string;
-                        organisationId: string;
-                        startsAt: Date;
-                        capacity: number
-                    }>>`
-                        SELECT "id", "organisationId", "startsAt", "capacity" 
-                        FROM "ClassSession"
-                        WHERE "id" = ${sessionId}
-                        FOR UPDATE
-                    `;
+    const parentMemberships = user.memberships.filter(
+        (membership) => membership.role === "PARENT"
+    );
+    const isParent = parentMemberships.length > 0;
+    const parentOrgIds = new Set(
+        parentMemberships.map((membership) => membership.organizationId)
+    );
 
-                    const session = lockedSessions[0];
-                    if (!session) {
-                        throw new Error("Session not found")
-                    }
+    try {
+        await db.$transaction(async (tx) => {
+            const lockedSessions = await tx.$queryRaw<Array<{
+                id: string;
+                organizationId: string;
+                startsAt: Date;
+                capacity: number
+            }>>`
+                SELECT "id", "organizationId", "startsAt", "capacity"
+                FROM "ClassSession"
+                WHERE "id" = ${sessionId}
+                FOR UPDATE
+            `;
 
-                    const [membership, child, existingEnrollment, enrollmentCount] = await Promise.all([
-                        tx.membership.findFirst({
-                            where: {
-                                userId: user.id,
-                                organizationId: session.organizationId,
-                                role: "PARENT"
-                            }
-                        }),
-                        tx.child.findFirst({
-                            where: { id: childId, parentId: user.id }
-                        }),
-                        tx.enrollment.findFirst({
-                            where: { sessionId, childId }
-                        }),
-                        tx.enrollment.count({
-                            where: { sessionId }
-                        })
-                    ])
-
-                    await tx.enrollment.create({
-                        data: { sessionId, childId }
-                    })
-                }
-            )
-        } catch (error) {
-            return {
-                ok: false,
-                message: error instanceof Error ? error.message: "Enrollment failed"
+            const session = lockedSessions[0];
+            if (!session) {
+                throw new Error("Session not found")
             }
+
+            const [child, existingEnrollment, enrollmentCount] = await Promise.all([
+                tx.child.findFirst({
+                    where: { id: childId, parentId: user.id }
+                }),
+                tx.enrollment.findFirst({
+                    where: { sessionId, childId }
+                }),
+                tx.enrollment.count({
+                    where: { sessionId }
+                })
+            ])
+
+            const blockReason = getEnrollmentBlockReason({
+                isParent,
+                sessionInParentOrg: parentOrgIds.has(session.organizationId),
+                childBelongsToParent: Boolean(child),
+                sessionStartsAt: session.startsAt,
+                now: new Date(),
+                capacity: session.capacity,
+                enrollmentCount,
+                alreadyEnrolled: Boolean(existingEnrollment),
+            })
+
+            if (blockReason) {
+                throw new Error(blockReason)
+            }
+
+            await tx.enrollment.create({
+                data: { sessionId, childId }
+            })
+        })
+    } catch (error) {
+        return {
+            ok: false,
+            message: error instanceof Error ? error.message : "Enrollment failed"
         }
     }
 
+    revalidatePath("/sessions");
     return {
-        ok: false,
-        message: "Enrollemnt failed, Please try again"
+        ok: true,
+        message: "Enrolled successfully"
     }
 }

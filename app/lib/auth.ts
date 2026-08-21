@@ -6,7 +6,8 @@ const USER_COOKIE = "demo-user-id";
 export async function getCurrentUserId() {
     const cookieStore = await cookies();
     const cookieUserId = cookieStore.get(USER_COOKIE)?.value;
-    return cookieUserId || process.env.CURRENT_USER_ID || null;
+    // Prefer .env so CURRENT_USER_ID always wins when set
+    return process.env.CURRENT_USER_ID || cookieUserId || null;
 }
 
 export async function getCurrentUser() {

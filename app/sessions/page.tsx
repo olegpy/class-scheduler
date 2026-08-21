@@ -1,5 +1,6 @@
 import {getCurrentUser} from "@/app/lib/auth";
 import {db} from "@/app/lib/db";
+import {EnrollmentForm} from "@/app/components/EnrollmentForm";
 
 function formatDate(date: Date) {
     return new Intl.DateTimeFormat("en-CA",{
@@ -7,8 +8,8 @@ function formatDate(date: Date) {
         timeStyle: "short"
     }).format(date)
 }
-export default async  function Sessions() {
-    const [user] = await Promise.all([getCurrentUser()])
+export default async function Sessions() {
+    const user = await getCurrentUser()
     if (!user) {
         return <main className="mx-auto w-full">No Users Found</main>
     }
@@ -39,9 +40,9 @@ export default async  function Sessions() {
             enrollments: { select: { childId: true } },
         }
     })
-    console.log('sessions - ', sessions);
     return (
         <main>
+            <p>Signed in as {user.name} ({user.email})</p>
             { sessions.length === 0 ? (
                 <div>No upcoming sessions are available for this suser</div>
             ) : (
@@ -66,7 +67,20 @@ export default async  function Sessions() {
                                     </div>
                                 </div>
 
-                                {/*{isParent && ()}*/}
+                                {isParent && (
+                                    <EnrollmentForm
+                                        sessionId={session.id}
+                                        availableChildren={availableChildren}
+                                        disabled={full}
+                                        disabledReason={
+                                            full
+                                                ? "This session is full."
+                                                : availableChildren.length === 0
+                                                    ? "All of your children are already enrolled."
+                                                    : undefined
+                                        }
+                                    />
+                                )}
                             </article>
                         )
                     }) }
